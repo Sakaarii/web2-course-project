@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require("../lib/prisma")
+const authenticate = require("../middleware/auth")
+const isOwner = require("../middleware/isOwner")
+
+router.use(authenticate)
 
 // GET /api/questions, /api/questions?option=france
 router.get('/', async (req, res) => {
@@ -55,7 +59,7 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /api/questions/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', isOwner, async (req, res) => {
     const { id } = req.params;
     const existingQuestion = await prisma.question.findUnique({
         where: { id: parseInt(id) },
@@ -89,7 +93,7 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE /api/questions/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', isOwner, async (req, res) => {
     const { id } = req.params;
     const existingQuestion = await prisma.question.findUnique({
         where: { id: parseInt(id) },
