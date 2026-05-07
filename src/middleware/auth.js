@@ -13,7 +13,7 @@ function authenticate(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
-        req.user = decoded; // Attach user info to request object
+        req.user = { userId: decoded.id }; // Attach user info to request object
         next();
     } catch (err) {
         return res.status(401).json({ error: 'Invalid token' });

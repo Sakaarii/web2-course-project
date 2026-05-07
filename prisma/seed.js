@@ -6,26 +6,26 @@ const seedQuestions = [
     {
         id: 1,
         question: "What is the capital of France?",
-        options: ["Paris", "London", "Berlin", "Madrid"],
+        keywords: ["Paris", "London", "Berlin", "Madrid"],
         answer: "Paris"
     },
     {
         id: 2,
         question: "What is the largest planet in our solar system?",
-        options: ["Earth", "Jupiter", "Mars", "Saturn"],
+        keywords: ["Earth", "Jupiter", "Mars", "Saturn"],
         answer: "Jupiter"
     },
     {
         id: 3,
         question: "Who is the president of Finland?",
-        options: ["Sauli Niinistö", "Sanna Marin", "Jussi Halla-aho", "Alexander Stubb"],
+        keywords: ["Sauli Niinistö", "Sanna Marin", "Jussi Halla-aho", "Alexander Stubb"],
         answer: "Alexander Stubb"
     }
 ];
 
 async function main(){
     await prisma.question.deleteMany({})
-    await prisma.option.deleteMany({})
+    await prisma.keyword.deleteMany({})
     await prisma.user.deleteMany({})
 
     const hashedPassword = await bcrypt.hash("password123", 10);
@@ -42,8 +42,8 @@ async function main(){
             data: {
                 question: question.question,
                 answer: question.answer,
-                options: {
-                    connectOrCreate: question.options.map((op)=>({
+                keywords: {
+                    connectOrCreate: question.keywords.map((op)=>({
                         where: {name: op},
                         create: {name: op}
                     })),
