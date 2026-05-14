@@ -1,33 +1,21 @@
-const express = require('express');
+const prisma = require("./lib/prisma");
+const app = require("./app");
+const logger = require("./lib/logger");
+const PORT = process.env.PORT || 3001;
 
-const app = express();
-const questionsRouter = require('./routes/questions');
-const authRouter = require('./routes/auth');
-const prisma = require('./lib/prisma');
-const PORT = process.env.PORT || 3000;
-const path = require('path');
+app.listen(PORT, () => {
+  logger.info(
+    { port: PORT },
+    `Server is running on port http://localhost:${PORT}`,
+  );
+});
 
+process.on("SIGINT", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-
-app.use(express.json());
-app.use('/api/questions', questionsRouter);
-app.use('/api/auth', authRouter);
-app.use((req, res) => {
-    res.status(404).json({ error: "Not found" });
-})
-
-app.listen(PORT, ()=>{
-    console.log(`Server is running on port http://localhost:${PORT}`);
-})
-
-process.on("SIGINT",  async() => {
-    await prisma.$disconnect();
-    process.exit(0);
-})
-
-process.on("SIGTERM",  async() => {
-    await prisma.$disconnect();
-    process.exit(0);
-})
+process.on("SIGTERM", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
