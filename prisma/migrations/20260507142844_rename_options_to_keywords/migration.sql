@@ -1,18 +1,18 @@
 /*
   Warnings:
 
-  - You are about to drop the `_optiontoquestion` table. If the table is not empty, all the data it contains will be lost.
+  - You are about to drop the `_OptionToQuestion` table. If the table is not empty, all the data it contains will be lost.
   - You are about to drop the `options` table. If the table is not empty, all the data it contains will be lost.
 
 */
 -- DropForeignKey
-ALTER TABLE `_optiontoquestion` DROP FOREIGN KEY `_OptionToQuestion_A_fkey`;
+ALTER TABLE `_OptionToQuestion` DROP FOREIGN KEY `_OptionToQuestion_A_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `_optiontoquestion` DROP FOREIGN KEY `_OptionToQuestion_B_fkey`;
+ALTER TABLE `_OptionToQuestion` DROP FOREIGN KEY `_OptionToQuestion_B_fkey`;
 
 -- DropTable
-DROP TABLE `_optiontoquestion`;
+DROP TABLE `_OptionToQuestion`;
 
 -- DropTable
 DROP TABLE `options`;
