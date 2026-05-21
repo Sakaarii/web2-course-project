@@ -1,0 +1,12 @@
+node_modules
+.evn
+.env.test
+.git
+.gitignore
+.DS_Store
+postman
+cms-bruno
+src/generated
+public/uploads/*
+!public/uploads/.gitkeep
+coverage
