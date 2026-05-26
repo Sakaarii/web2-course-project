@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY prisma ./prisma
-RUN DATABASE_URL="mysql://user:pass@localhost:3306/db" npx prisma generate
+RUN DATABASE_URL="mysql://user:password@localhost:3306/db" npx prisma generate
 
 COPY . .
 

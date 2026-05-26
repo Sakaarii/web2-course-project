@@ -8,6 +8,9 @@ const errorHandler = require("./middleware/errorHandler");
 const pinoHttp = require("pino-http");
 const logger = require("./lib/logger");
 
+const cors = require("cors");
+app.use(cors());
+
 app.use(
   pinoHttp({
     logger,
@@ -20,6 +23,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 app.use("/api/questions", questionsRouter);
 app.use("/api/auth", authRouter);
+
+const { NotFoundError } = require("./lib/errors");
 
 app.use((req, res) => {
   throw new NotFoundError();
