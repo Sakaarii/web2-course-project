@@ -116,7 +116,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       question,
       imageUrl,
       keywords: {
-        connectOrCreate: keywords.map((keyword) => ({
+        connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({
           where: { name: keyword },
           create: { name: keyword },
         })),
@@ -182,7 +182,7 @@ router.put("/:id", upload.single("image"), isOwner, async (req, res) => {
     data: {
       question,
       keywords: {
-        connectOrCreate: keywords.map((keyword) => ({
+        connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({
           where: { name: keyword },
           create: { name: keyword },
         })),
