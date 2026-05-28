@@ -1,5 +1,15 @@
 // --- State ---
 let isRegisterMode = false;
+let captchaWidgetId = null;
+window.onRecaptchaLoad = function() {
+  const container = document.getElementById('recaptcha-container');
+  if (container && window.grecaptcha && grecaptcha.render) {
+    // avoid double render
+    if (captchaWidgetId === null) {
+      captchaWidgetId = grecaptcha.render('recaptcha-container', { sitekey: '6Ld5uAAtAAAAAAFY8f6MPA65EK_Wuy2x6WluyWp4' });
+    }
+  }
+};
 
 // --- Helpers ---
 function getCurrentUserId() {
@@ -64,10 +74,10 @@ function renderAuthForm() {
           <div class="form-group">
             <label for="${f}">${label}</label>
             <input type="${type}" id="${f}" name="${f}" required />
-            <div class="g-recaptcha" data-sitekey="6Ld5uAAtAAAAAAFY8f6MPA65EK_Wuy2x6WluyWp4"></div>
           </div>`;
         })
         .join("")}
+      ${isRegisterMode ? '<div id="recaptcha-container"></div>' : ''}
       <button type="submit">${title}</button>
     </form>
     <p class="switch-text">${switchText}</p>
@@ -81,6 +91,20 @@ function renderAuthForm() {
     isRegisterMode = !isRegisterMode;
     renderAuthForm();
   });
+
+  // reset any previous captcha widget id when re-rendering
+  if (window.grecaptcha && captchaWidgetId !== null) {
+    try { grecaptcha.reset(captchaWidgetId); } catch (err) {}
+    captchaWidgetId = null;
+  }
+
+  // render captcha if in register mode and grecaptcha is available
+  if (isRegisterMode) {
+    const container = document.getElementById('recaptcha-container');
+    if (container && window.grecaptcha && grecaptcha.render) {
+      captchaWidgetId = grecaptcha.render('recaptcha-container', { sitekey: '6Ld5uAAtAAAAAAFY8f6MPA65EK_Wuy2x6WluyWp4' });
+    }
+  }
 }
 
 async function handleAuth(e) {
@@ -95,6 +119,19 @@ async function handleAuth(e) {
   fields.forEach((f) => {
     body[f] = document.getElementById(f).value;
   });
+
+  // include captcha response when registering
+  if (isRegisterMode) {
+    let captchaResponse = null;
+    if (window.grecaptcha) {
+      try {
+        captchaResponse = captchaWidgetId !== null ? grecaptcha.getResponse(captchaWidgetId) : grecaptcha.getResponse();
+      } catch (err) {
+        captchaResponse = null;
+      }
+    }
+    body["g-recaptcha-response"] = captchaResponse;
+  }
 
   try {
     const data = await apiFetch(route, {
