@@ -54,15 +54,17 @@ function renderAuthForm() {
 
   const formHTML = `
     <h2>${title}</h2>
-    <form id="auth-form">
+    <form id="auth-form" method="POST">
       ${fields
         .map((f) => {
-          const type = f === "password" ? "password" : f === "email" ? "email" : "text";
+          const type =
+            f === "password" ? "password" : f === "email" ? "email" : "text";
           const label = f.charAt(0).toUpperCase() + f.slice(1);
           return `
           <div class="form-group">
             <label for="${f}">${label}</label>
             <input type="${type}" id="${f}" name="${f}" required />
+            <div class="g-recaptcha" data-sitekey="6Ld5uAAtAAAAAAFY8f6MPA65EK_Wuy2x6WluyWp4"></div>
           </div>`;
         })
         .join("")}
@@ -119,13 +121,18 @@ async function loadQuestions(keyword = "", page = 1) {
   container.innerHTML = '<p class="loading">Loading questions...</p>';
 
   try {
-    const params = new URLSearchParams({ page, limit: CONFIG.QUESTIONS_PER_PAGE });
+    const params = new URLSearchParams({
+      page,
+      limit: CONFIG.QUESTIONS_PER_PAGE,
+    });
     if (keyword) params.set("keyword", keyword);
     const result = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}?${params}`);
     const { data: questions, total, totalPages } = result;
     const currentUserId = getCurrentUserId();
 
-    const solvedCount = questions.filter((q) => q[CONFIG.API_FIELDS.SOLVED]).length;
+    const solvedCount = questions.filter(
+      (q) => q[CONFIG.API_FIELDS.SOLVED],
+    ).length;
 
     let html = `
       <div class="score-bar">
@@ -148,7 +155,8 @@ async function loadQuestions(keyword = "", page = 1) {
       </div>`;
 
     if (questions.length === 0) {
-      html += '<p class="empty-state">No questions found. Create one to get started!</p>';
+      html +=
+        '<p class="empty-state">No questions found. Create one to get started!</p>';
     } else {
       html += questions
         .map(
@@ -177,7 +185,7 @@ async function loadQuestions(keyword = "", page = 1) {
                 : ""
             }
           </div>
-        </article>`
+        </article>`,
         )
         .join("");
     }
@@ -193,24 +201,30 @@ async function loadQuestions(keyword = "", page = 1) {
 
     container.innerHTML = html;
 
-    document.getElementById("new-question-btn").addEventListener("click", () => showQuestionForm());
+    document
+      .getElementById("new-question-btn")
+      .addEventListener("click", () => showQuestionForm());
 
     document.getElementById("search-btn").addEventListener("click", () => {
       loadQuestions(document.getElementById("keyword-input").value.trim(), 1);
     });
 
-    document.getElementById("keyword-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") loadQuestions(e.target.value.trim(), 1);
-    });
+    document
+      .getElementById("keyword-input")
+      .addEventListener("keydown", (e) => {
+        if (e.key === "Enter") loadQuestions(e.target.value.trim(), 1);
+      });
 
     const clearBtn = document.getElementById("clear-btn");
     if (clearBtn) clearBtn.addEventListener("click", () => loadQuestions());
 
     const prevBtn = document.getElementById("prev-btn");
-    if (prevBtn) prevBtn.addEventListener("click", () => loadQuestions(keyword, page - 1));
+    if (prevBtn)
+      prevBtn.addEventListener("click", () => loadQuestions(keyword, page - 1));
 
     const nextBtn = document.getElementById("next-btn");
-    if (nextBtn) nextBtn.addEventListener("click", () => loadQuestions(keyword, page + 1));
+    if (nextBtn)
+      nextBtn.addEventListener("click", () => loadQuestions(keyword, page + 1));
 
     container.querySelectorAll(".question-link, .read-more").forEach((el) => {
       el.addEventListener("click", (e) => {
@@ -231,7 +245,10 @@ async function loadQuestions(keyword = "", page = 1) {
       el.addEventListener("click", () => playQuestion(el.dataset.id));
     });
   } catch (err) {
-    if (err.message === "No token provided" || err.message === "Invalid or expired token") {
+    if (
+      err.message === "No token provided" ||
+      err.message === "Invalid or expired token"
+    ) {
       removeToken();
       showAuth();
       return;
@@ -277,8 +294,12 @@ async function loadQuestionDetail(qId) {
     });
 
     if (isOwner) {
-      document.getElementById("detail-edit-btn").addEventListener("click", () => showQuestionForm(qId));
-      document.getElementById("detail-delete-btn").addEventListener("click", () => deleteQuestion(qId));
+      document
+        .getElementById("detail-edit-btn")
+        .addEventListener("click", () => showQuestionForm(qId));
+      document
+        .getElementById("detail-delete-btn")
+        .addEventListener("click", () => deleteQuestion(qId));
     }
   } catch (err) {
     container.innerHTML = `<p class="error">${err.message}</p>`;
@@ -332,29 +353,34 @@ async function showQuestionForm(qId) {
     loadQuestions();
   });
 
-  document.getElementById("question-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const errorEl = document.getElementById("question-form-error");
-    errorEl.textContent = "";
+  document
+    .getElementById("question-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("question-form-error");
+      errorEl.textContent = "";
 
-    const body = new FormData();
-    body.append("question", document.getElementById("q-question").value);
-    body.append("answer", document.getElementById("q-answer").value);
-    body.append("keywords", document.getElementById("q-keywords").value);
-    const imageFile = document.getElementById("q-image").files[0];
-    if (imageFile) body.append("image", imageFile);
+      const body = new FormData();
+      body.append("question", document.getElementById("q-question").value);
+      body.append("answer", document.getElementById("q-answer").value);
+      body.append("keywords", document.getElementById("q-keywords").value);
+      const imageFile = document.getElementById("q-image").files[0];
+      if (imageFile) body.append("image", imageFile);
 
-    try {
-      if (isEdit) {
-        await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}`, { method: "PUT", body });
-      } else {
-        await apiFetch(CONFIG.ROUTES.QUESTIONS, { method: "POST", body });
+      try {
+        if (isEdit) {
+          await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}`, {
+            method: "PUT",
+            body,
+          });
+        } else {
+          await apiFetch(CONFIG.ROUTES.QUESTIONS, { method: "POST", body });
+        }
+        loadQuestions();
+      } catch (err) {
+        errorEl.textContent = err.message;
       }
-      loadQuestions();
-    } catch (err) {
-      errorEl.textContent = err.message;
-    }
-  });
+    });
 }
 
 // --- Play ---
@@ -393,33 +419,38 @@ async function playQuestion(qId) {
       loadQuestions();
     });
 
-    document.getElementById("play-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const errorEl = document.getElementById("play-error");
-      const resultEl = document.getElementById("play-result");
-      errorEl.textContent = "";
-      resultEl.innerHTML = "";
+    document
+      .getElementById("play-form")
+      .addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById("play-error");
+        const resultEl = document.getElementById("play-result");
+        errorEl.textContent = "";
+        resultEl.innerHTML = "";
 
-      const answer = document.getElementById("play-answer").value;
+        const answer = document.getElementById("play-answer").value;
 
-      try {
-        const result = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}/play`, {
-          method: "POST",
-          body: JSON.stringify({ answer }),
-        });
+        try {
+          const result = await apiFetch(
+            `${CONFIG.ROUTES.QUESTIONS}/${qId}/play`,
+            {
+              method: "POST",
+              body: JSON.stringify({ answer }),
+            },
+          );
 
-        if (result.correct) {
-          resultEl.innerHTML = `<div class="play-result correct">Correct!</div>`;
-        } else {
-          resultEl.innerHTML = `
+          if (result.correct) {
+            resultEl.innerHTML = `<div class="play-result correct">Correct!</div>`;
+          } else {
+            resultEl.innerHTML = `
             <div class="play-result incorrect">
               Incorrect! The answer was: <strong>${result.correctAnswer}</strong>
             </div>`;
+          }
+        } catch (err) {
+          errorEl.textContent = err.message;
         }
-      } catch (err) {
-        errorEl.textContent = err.message;
-      }
-    });
+      });
   } catch (err) {
     container.innerHTML = `<p class="error">${err.message}</p>`;
   }

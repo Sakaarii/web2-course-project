@@ -10,9 +10,15 @@ const {
   ForbiddenError,
 } = require("../lib/errors");
 const SECRET = process.env.JWT_SECRET;
+const { verifyCaptcha } = require("../lib/captcha");
 
 router.post("/register", async (req, res) => {
-  const { email, username, password } = req.body;
+  const {
+    email,
+    username,
+    password,
+    "g-recaptcha-response": gRecaptcha,
+  } = req.body;
 
   if (!email || !username || !password) {
     throw new ValidationError("Email, username or passwords missing");
@@ -21,6 +27,11 @@ router.post("/register", async (req, res) => {
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     throw new ConflictError("Email already registered");
+  }
+
+  const isCaptchaValid = await verifyCaptcha(gRecaptcha);
+  if (!isCaptchaValid) {
+    throw new ForbiddenError("Invalid captcha");
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
