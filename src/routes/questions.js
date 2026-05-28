@@ -8,11 +8,44 @@ const path = require("path");
 const { NotFoundError, ValidationError } = require("../lib/errors");
 const { z } = require("zod");
 
-const QuestionInput = z.object({
+const ChoiceInput = z.object({
+  text: z.string().min(1).max(255),
+  isCorrect: z.union([z.boolean(), z.string()]).transform((v) =>
+    typeof v === "string" ? v === "true" : v,
+  ),
+});
+
+const TextQuestionInput = z.object({
+  type: z.literal("TEXT").optional(),
   question: z.string().min(1),
   answer: z.string().min(1),
   keywords: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+const MultipleChoiceQuestionInput = z.object({
+  type: z.literal("MULTIPLE_CHOICE"),
+  question: z.string().min(1),
+  keywords: z.union([z.string(), z.array(z.string())]).optional(),
+  choices: z
+    .union([z.string(), z.array(ChoiceInput)])
+    .transform((v) => (typeof v === "string" ? JSON.parse(v) : v))
+    .pipe(z.array(ChoiceInput).min(2).max(4)),
+});
+
+function parseQuestionInput(body) {
+  const type = body.type || "TEXT";
+  if (type === "MULTIPLE_CHOICE") {
+    const parsed = MultipleChoiceQuestionInput.parse(body);
+    const correctCount = parsed.choices.filter((c) => c.isCorrect).length;
+    if (correctCount !== 1) {
+      throw new ValidationError("Exactly one choice must be marked correct");
+    }
+    parsed.answer = parsed.choices.find((c) => c.isCorrect).text;
+    return parsed;
+  }
+  const parsed = TextQuestionInput.parse(body);
+  return { ...parsed, type: "TEXT", choices: null };
+}
 
 function normalizeKeywords(kw) {
   if (kw == null) return [];
@@ -44,13 +77,20 @@ const upload = multer({
 
 router.use(authenticate);
 
-const formatQuestion = (question) => {
+const formatQuestion = (question, { includeCorrect = false } = {}) => {
   return {
     ...question,
     userName: question.user ? question.user.name : null,
     attempted: question.attempts && question.attempts.length > 0,
     AttemptCount: question._count ? question._count.attempts : 0,
     keywords: question.keywords ? question.keywords.map((k) => k.name) : [],
+    choices: question.choices
+      ? question.choices.map((c) => ({
+          id: c.id,
+          text: c.text,
+          ...(includeCorrect ? { isCorrect: c.isCorrect } : {}),
+        }))
+      : [],
     user: undefined,
     attempts: undefined,
     _count: undefined,
@@ -72,6 +112,7 @@ router.get("/", async (req, res) => {
       where,
       include: {
         keywords: true,
+        choices: true,
         user: true,
         attempts: { where: { userId: req.user.userId }, take: 1 },
         _count: { select: { attempts: true } },
@@ -84,7 +125,7 @@ router.get("/", async (req, res) => {
   ]);
 
   res.json({
-    data: filteredQuestions.map(formatQuestion),
+    data: filteredQuestions.map((q) => formatQuestion(q)),
     page,
     limit,
     total,
@@ -97,23 +138,26 @@ router.get("/:id", async (req, res) => {
   const { id } = req.params;
   const question = await prisma.question.findUnique({
     where: { id: parseInt(id) },
-    include: { keywords: true, user: true },
+    include: { keywords: true, choices: true, user: true },
   });
   if (!question) {
     throw new NotFoundError("Question not found");
   }
-  res.json(formatQuestion(question));
+  const includeCorrect = question.userId === req.user.userId;
+  res.json(formatQuestion(question, { includeCorrect }));
 });
 
 // POST /api/questions
 router.post("/", upload.single("image"), async (req, res) => {
-  const { question, answer, keywords } = QuestionInput.parse(req.body);
+  const parsed = parseQuestionInput(req.body);
+  const { question, answer, keywords, type, choices } = parsed;
 
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
   const newQuestion = await prisma.question.create({
     data: {
       question,
+      type,
       imageUrl,
       keywords: {
         connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({
@@ -123,41 +167,63 @@ router.post("/", upload.single("image"), async (req, res) => {
       },
       answer,
       userId: req.user.userId,
+      ...(choices
+        ? {
+            choices: {
+              create: choices.map((c) => ({
+                text: c.text,
+                isCorrect: c.isCorrect,
+              })),
+            },
+          }
+        : {}),
     },
-    include: { keywords: true, user: true },
+    include: { keywords: true, choices: true, user: true },
   });
 
-  res.status(201).json(formatQuestion(newQuestion));
+  res.status(201).json(formatQuestion(newQuestion, { includeCorrect: true }));
 });
 
 // POST /api/questions/:id/play
-
 router.post("/:id/play", async (req, res) => {
   const { id } = req.params;
   const question = await prisma.question.findUnique({
     where: { id: parseInt(id) },
+    include: { choices: true },
   });
   if (!question) {
     throw new NotFoundError("Question not found");
   }
 
-  if (question.answer.toLowerCase() === req.body.answer.toLowerCase()) {
-    res.json({
-      id: question.id,
-      createdAt: new Date(),
-      correct: true,
-      correctAnswer: question.answer,
-      submittedAnswer: req.body.answer,
-    });
+  let correct = false;
+  let submittedAnswer = null;
+
+  if (question.type === "MULTIPLE_CHOICE") {
+    const choiceId = parseInt(req.body.choiceId);
+    if (!choiceId) {
+      throw new ValidationError("choiceId is required");
+    }
+    const chosen = question.choices.find((c) => c.id === choiceId);
+    if (!chosen) {
+      throw new ValidationError("Invalid choice for this question");
+    }
+    correct = chosen.isCorrect;
+    submittedAnswer = chosen.text;
   } else {
-    res.json({
-      id: question.id,
-      createdAt: new Date(),
-      correct: false,
-      correctAnswer: question.answer,
-      submittedAnswer: req.body.answer,
-    });
+    if (typeof req.body.answer !== "string") {
+      throw new ValidationError("answer is required");
+    }
+    submittedAnswer = req.body.answer;
+    correct = question.answer.toLowerCase() === submittedAnswer.toLowerCase();
   }
+
+  res.json({
+    id: question.id,
+    createdAt: new Date(),
+    correct,
+    correctAnswer: question.answer,
+    submittedAnswer,
+  });
 });
 
 // PUT /api/questions/:id
@@ -165,35 +231,51 @@ router.put("/:id", upload.single("image"), isOwner, async (req, res) => {
   const { id } = req.params;
   const existingQuestion = await prisma.question.findUnique({
     where: { id: parseInt(id) },
-    include: { keywords: true, user: true },
+    include: { keywords: true, choices: true, user: true },
   });
   if (!existingQuestion) {
     throw new NotFoundError("Question not found");
   }
 
-  const { question, answer, keywords } = QuestionInput.parse(req.body);
+  const parsed = parseQuestionInput(req.body);
+  const { question, answer, keywords, type, choices } = parsed;
 
   const imageUrl = req.file
     ? `/uploads/${req.file.filename}`
     : existingQuestion.imageUrl;
 
-  const updatedQuestion = await prisma.question.update({
-    where: { id: parseInt(id) },
-    data: {
-      question,
-      keywords: {
-        connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({
-          where: { name: keyword },
-          create: { name: keyword },
-        })),
+  const updatedQuestion = await prisma.$transaction(async (tx) => {
+    await tx.choice.deleteMany({ where: { questionId: parseInt(id) } });
+    return tx.question.update({
+      where: { id: parseInt(id) },
+      data: {
+        question,
+        type,
+        keywords: {
+          set: [],
+          connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({
+            where: { name: keyword },
+            create: { name: keyword },
+          })),
+        },
+        answer,
+        imageUrl,
+        ...(choices
+          ? {
+              choices: {
+                create: choices.map((c) => ({
+                  text: c.text,
+                  isCorrect: c.isCorrect,
+                })),
+              },
+            }
+          : {}),
       },
-      answer,
-      imageUrl,
-    },
-    include: { keywords: true, user: true },
+      include: { keywords: true, choices: true, user: true },
+    });
   });
 
-  res.json(formatQuestion(updatedQuestion));
+  res.json(formatQuestion(updatedQuestion, { includeCorrect: true }));
 });
 
 // DELETE /api/questions/:id
@@ -201,19 +283,19 @@ router.delete("/:id", isOwner, async (req, res) => {
   const { id } = req.params;
   const existingQuestion = await prisma.question.findUnique({
     where: { id: parseInt(id) },
-    include: { keywords: true, user: true },
+    include: { keywords: true, choices: true, user: true },
   });
   if (!existingQuestion) {
     throw new NotFoundError("Question not found");
   }
   const deletedQuestion = await prisma.question.delete({
     where: { id: parseInt(id) },
-    include: { keywords: true, user: true },
+    include: { keywords: true, choices: true, user: true },
   });
 
   res.json({
     message: "Question deleted successfully",
-    question: formatQuestion(deletedQuestion),
+    question: formatQuestion(deletedQuestion, { includeCorrect: true }),
   });
 });
 

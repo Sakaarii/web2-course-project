@@ -201,6 +201,7 @@ async function loadQuestions(keyword = "", page = 1) {
         <article class="question-card ${q[CONFIG.API_FIELDS.SOLVED] ? "solved-card" : ""}">
           <h3>
             <a href="#" class="question-link" data-id="${q.id}">${q.question}</a>
+            ${q.type === "MULTIPLE_CHOICE" ? `<span class="badge-mc">Multiple choice</span>` : ""}
             ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}
           </h3>
           ${
@@ -306,10 +307,23 @@ async function loadQuestionDetail(qId) {
     container.innerHTML = `
       <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
       <article class="question-card question-detail">
-        <h3>${q.question} ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}</h3>
+        <h3>${q.question}
+          ${q.type === "MULTIPLE_CHOICE" ? `<span class="badge-mc">Multiple choice</span>` : ""}
+          ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}
+        </h3>
         <p class="question-meta">by ${q.userName || "Unknown"}</p>
         ${q.imageUrl ? `<img class="question-image" src="${q.imageUrl}" alt="">` : ""}
         <p class="question-answer">${q.answer}</p>
+        ${
+          q.type === "MULTIPLE_CHOICE" && q.choices && q.choices.length
+            ? `<ul class="choice-list">${q.choices
+                .map(
+                  (c) =>
+                    `<li class="choice-item ${c.text === q.answer ? "choice-correct" : ""}">${c.text}${c.text === q.answer ? " <span class=\"choice-tag\">correct</span>" : ""}</li>`,
+                )
+                .join("")}</ul>`
+            : ""
+        }
         ${
           q.keywords && q.keywords.length
             ? `<div class="question-keywords">${q.keywords.map((k) => `<span class="keyword">${k}</span>`).join("")}</div>`
@@ -344,10 +358,22 @@ async function loadQuestionDetail(qId) {
 }
 
 // --- Create / Edit ---
+const MAX_CHOICES = 4;
+const MIN_CHOICES = 2;
+
+function renderChoiceRow(idx, text = "", checked = false) {
+  return `
+    <div class="choice-row" data-row="${idx}">
+      <input type="radio" name="q-choice-correct" value="${idx}" ${checked ? "checked" : ""} aria-label="Mark as correct" />
+      <input type="text" class="q-choice-text" placeholder="Choice ${idx + 1}" value="${text.replace(/"/g, "&quot;")}" />
+      <button type="button" class="btn btn-clear remove-choice-btn" title="Remove">&times;</button>
+    </div>`;
+}
+
 async function showQuestionForm(qId) {
   const container = document.getElementById("questions-container");
   const isEdit = !!qId;
-  let q = { question: "", answer: "", keywords: [] };
+  let q = { question: "", answer: "", keywords: [], type: "TEXT", choices: [] };
 
   if (isEdit) {
     try {
@@ -358,18 +384,40 @@ async function showQuestionForm(qId) {
     }
   }
 
+  const initialType = q.type === "MULTIPLE_CHOICE" ? "MULTIPLE_CHOICE" : "TEXT";
+  const initialChoices =
+    initialType === "MULTIPLE_CHOICE" && q.choices && q.choices.length
+      ? q.choices
+      : [{ text: "", isCorrect: true }, { text: "", isCorrect: false }];
+
   container.innerHTML = `
     <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
     <div class="question-form-wrapper">
       <h2>${isEdit ? "Edit Question" : "New Question"}</h2>
       <form id="question-form" enctype="multipart/form-data">
         <div class="form-group">
-          <label for="q-question">Question</label>
-          <input type="text" id="q-question" value="${q.question}" required />
+          <label>Question type</label>
+          <div class="type-toggle">
+            <label><input type="radio" name="q-type" value="TEXT" ${initialType === "TEXT" ? "checked" : ""}/> Text</label>
+            <label><input type="radio" name="q-type" value="MULTIPLE_CHOICE" ${initialType === "MULTIPLE_CHOICE" ? "checked" : ""}/> Multiple choice</label>
+          </div>
         </div>
         <div class="form-group">
+          <label for="q-question">Question</label>
+          <input type="text" id="q-question" value="${q.question.replace(/"/g, "&quot;")}" required />
+        </div>
+        <div class="form-group" id="text-answer-group">
           <label for="q-answer">Answer</label>
-          <textarea id="q-answer" rows="4" required>${q.answer}</textarea>
+          <textarea id="q-answer" rows="4">${q.answer || ""}</textarea>
+        </div>
+        <div class="form-group" id="choices-group">
+          <label>Choices (${MIN_CHOICES}-${MAX_CHOICES}, pick the correct one)</label>
+          <div id="choices-list">
+            ${initialChoices
+              .map((c, i) => renderChoiceRow(i, c.text || "", !!c.isCorrect))
+              .join("")}
+          </div>
+          <button type="button" id="add-choice-btn" class="btn btn-edit">+ Add choice</button>
         </div>
         <div class="form-group">
           <label for="q-keywords">Keywords (comma-separated)</label>
@@ -390,6 +438,69 @@ async function showQuestionForm(qId) {
     loadQuestions();
   });
 
+  const textGroup = document.getElementById("text-answer-group");
+  const choicesGroup = document.getElementById("choices-group");
+  const choicesList = document.getElementById("choices-list");
+  const addBtn = document.getElementById("add-choice-btn");
+  const answerEl = document.getElementById("q-answer");
+
+  function applyType() {
+    const t = document.querySelector('input[name="q-type"]:checked').value;
+    if (t === "MULTIPLE_CHOICE") {
+      textGroup.style.display = "none";
+      choicesGroup.style.display = "";
+      answerEl.required = false;
+    } else {
+      textGroup.style.display = "";
+      choicesGroup.style.display = "none";
+      answerEl.required = true;
+    }
+  }
+
+  function reindexChoices() {
+    const rows = choicesList.querySelectorAll(".choice-row");
+    rows.forEach((row, i) => {
+      row.dataset.row = i;
+      const radio = row.querySelector('input[type="radio"]');
+      radio.value = i;
+      const textInput = row.querySelector(".q-choice-text");
+      textInput.placeholder = `Choice ${i + 1}`;
+    });
+    addBtn.disabled = rows.length >= MAX_CHOICES;
+  }
+
+  function ensureOneChecked() {
+    const radios = choicesList.querySelectorAll('input[type="radio"]');
+    if (radios.length && !Array.from(radios).some((r) => r.checked)) {
+      radios[0].checked = true;
+    }
+  }
+
+  document
+    .querySelectorAll('input[name="q-type"]')
+    .forEach((el) => el.addEventListener("change", applyType));
+
+  addBtn.addEventListener("click", () => {
+    const count = choicesList.querySelectorAll(".choice-row").length;
+    if (count >= MAX_CHOICES) return;
+    choicesList.insertAdjacentHTML("beforeend", renderChoiceRow(count));
+    reindexChoices();
+  });
+
+  choicesList.addEventListener("click", (e) => {
+    if (e.target.classList.contains("remove-choice-btn")) {
+      const rows = choicesList.querySelectorAll(".choice-row");
+      if (rows.length <= MIN_CHOICES) return;
+      e.target.closest(".choice-row").remove();
+      reindexChoices();
+      ensureOneChecked();
+    }
+  });
+
+  applyType();
+  reindexChoices();
+  ensureOneChecked();
+
   document
     .getElementById("question-form")
     .addEventListener("submit", async (e) => {
@@ -397,10 +508,31 @@ async function showQuestionForm(qId) {
       const errorEl = document.getElementById("question-form-error");
       errorEl.textContent = "";
 
+      const type = document.querySelector('input[name="q-type"]:checked').value;
       const body = new FormData();
+      body.append("type", type);
       body.append("question", document.getElementById("q-question").value);
-      body.append("answer", document.getElementById("q-answer").value);
       body.append("keywords", document.getElementById("q-keywords").value);
+
+      if (type === "MULTIPLE_CHOICE") {
+        const rows = Array.from(choicesList.querySelectorAll(".choice-row"));
+        const choices = rows.map((row) => ({
+          text: row.querySelector(".q-choice-text").value.trim(),
+          isCorrect: row.querySelector('input[type="radio"]').checked,
+        }));
+        if (choices.some((c) => !c.text)) {
+          errorEl.textContent = "All choices must have text";
+          return;
+        }
+        if (choices.filter((c) => c.isCorrect).length !== 1) {
+          errorEl.textContent = "Pick exactly one correct choice";
+          return;
+        }
+        body.append("choices", JSON.stringify(choices));
+      } else {
+        body.append("answer", document.getElementById("q-answer").value);
+      }
+
       const imageFile = document.getElementById("q-image").files[0];
       if (imageFile) body.append("image", imageFile);
 
@@ -428,6 +560,27 @@ async function playQuestion(qId) {
   try {
     const q = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}/${qId}`);
 
+    const isMC = q.type === "MULTIPLE_CHOICE";
+    const answerFieldHtml = isMC
+      ? `<div class="form-group">
+          <label>Pick the correct answer</label>
+          <div class="play-choices">
+            ${(q.choices || [])
+              .map(
+                (c) => `
+              <label class="play-choice">
+                <input type="radio" name="play-choice" value="${c.id}" required />
+                <span>${c.text}</span>
+              </label>`,
+              )
+              .join("")}
+          </div>
+        </div>`
+      : `<div class="form-group">
+          <label for="play-answer">Your answer</label>
+          <textarea id="play-answer" rows="3" required></textarea>
+        </div>`;
+
     container.innerHTML = `
       <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
       <div class="question-form-wrapper" style="text-align:center">
@@ -439,10 +592,7 @@ async function playQuestion(qId) {
             : ""
         }
         <form id="play-form" style="text-align:left">
-          <div class="form-group">
-            <label for="play-answer">Your answer</label>
-            <textarea id="play-answer" rows="3" required></textarea>
-          </div>
+          ${answerFieldHtml}
           <div style="text-align:center">
             <button type="submit" class="btn btn-play" style="padding:0.7rem 2.5rem;font-size:1rem">Submit</button>
           </div>
@@ -465,14 +615,26 @@ async function playQuestion(qId) {
         errorEl.textContent = "";
         resultEl.innerHTML = "";
 
-        const answer = document.getElementById("play-answer").value;
+        let payload;
+        if (isMC) {
+          const picked = document.querySelector(
+            'input[name="play-choice"]:checked',
+          );
+          if (!picked) {
+            errorEl.textContent = "Pick a choice";
+            return;
+          }
+          payload = { choiceId: Number(picked.value) };
+        } else {
+          payload = { answer: document.getElementById("play-answer").value };
+        }
 
         try {
           const result = await apiFetch(
             `${CONFIG.ROUTES.QUESTIONS}/${qId}/play`,
             {
               method: "POST",
-              body: JSON.stringify({ answer }),
+              body: JSON.stringify(payload),
             },
           );
 

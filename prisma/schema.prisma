@@ -28,13 +28,30 @@ model Question {
   id  Int @id @default(autoincrement())
   question String @db.VarChar(255)
   answer String @db.VarChar(255)
+  type QuestionType @default(TEXT)
   keywords Keyword[]
+  choices Choice[]
   imageUrl String? @db.VarChar(255)
   userId Int
   user User @relation(fields: [userId], references: [id])
   attempts Attempt[]
 
   @@map("questions")
+}
+
+enum QuestionType {
+  TEXT
+  MULTIPLE_CHOICE
+}
+
+model Choice {
+  id Int @id @default(autoincrement())
+  text String @db.VarChar(255)
+  isCorrect Boolean @default(false)
+  questionId Int
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("choices")
 }
 
 model Keyword {

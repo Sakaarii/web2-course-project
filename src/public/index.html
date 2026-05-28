@@ -293,6 +293,120 @@
                 border: 1px solid rgba(167, 139, 250, 0.25);
             }
 
+            /* Multiple-choice badge */
+            .badge-mc {
+                background: linear-gradient(135deg, #a78bfa, #7c3aed);
+                color: #fff;
+                padding: 0.2rem 0.7rem;
+                border-radius: 20px;
+                font-size: 0.7rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            /* Type toggle (form) */
+            .type-toggle {
+                display: flex;
+                gap: 1rem;
+                color: #ccc;
+                font-weight: 600;
+            }
+            .type-toggle label {
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+                cursor: pointer;
+                font-size: 0.9rem;
+            }
+
+            /* Choice editor */
+            .choice-row {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                margin-bottom: 0.5rem;
+            }
+            .choice-row input[type="text"] {
+                flex: 1;
+                padding: 0.55rem 0.9rem;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 10px;
+                color: #fff;
+                font-family: inherit;
+                font-size: 0.95rem;
+            }
+            .choice-row input[type="text"]:focus {
+                outline: none;
+                border-color: #ffd200;
+            }
+            .remove-choice-btn {
+                padding: 0.3rem 0.7rem;
+                font-size: 1rem;
+                line-height: 1;
+            }
+            #add-choice-btn {
+                margin-top: 0.4rem;
+            }
+            #add-choice-btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+            /* Detail view: choice list */
+            .choice-list {
+                list-style: none;
+                margin: 1rem 0;
+                padding: 0;
+            }
+            .choice-item {
+                padding: 0.6rem 1rem;
+                margin-bottom: 0.4rem;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+                color: #ddd;
+                font-size: 0.95rem;
+            }
+            .choice-item.choice-correct {
+                background: rgba(81, 207, 102, 0.12);
+                border-color: rgba(81, 207, 102, 0.35);
+                color: #fff;
+            }
+            .choice-tag {
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: #51cf66;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-left: 0.4rem;
+            }
+
+            /* Play view: choice list */
+            .play-choices {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .play-choice {
+                display: flex;
+                align-items: center;
+                gap: 0.7rem;
+                padding: 0.7rem 1rem;
+                background: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                cursor: pointer;
+                color: #ddd;
+                font-size: 0.95rem;
+                transition: border-color 0.15s, background 0.15s;
+            }
+            .play-choice:hover {
+                border-color: rgba(255, 210, 0, 0.4);
+                background: rgba(255, 255, 255, 0.09);
+            }
+
             /* Solved badge */
             .badge-solved {
                 background: linear-gradient(135deg, #51cf66, #40c057);
