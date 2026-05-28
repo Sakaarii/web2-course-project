@@ -5,16 +5,20 @@ const authenticate = require("../middleware/auth");
 const isOwner = require("../middleware/isOwner");
 const multer = require("multer");
 const path = require("path");
-const { timeStamp } = require("console");
 const { NotFoundError, ValidationError } = require("../lib/errors");
 const { z } = require("zod");
 
 const QuestionInput = z.object({
   question: z.string().min(1),
-  date: z.string().date(),
   answer: z.string().min(1),
   keywords: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+function normalizeKeywords(kw) {
+  if (kw == null) return [];
+  const arr = Array.isArray(kw) ? kw : kw.split(",");
+  return arr.map((s) => s.trim()).filter(Boolean);
+}
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, "..", "..", "public", "uploads"),
@@ -29,25 +33,13 @@ const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed!"), false);
+      return cb(null, true);
     }
-
-    limits: {
-      fileSize: 5 * 1024 * 1024;
-    } // 5MB
+    return cb(new Error("Only image files are allowed!"), false);
   },
-});
-
-router.use((err, req, res, next) => {
-  if (
-    err instanceof multer.MulterError ||
-    err?.message === "Only image files are allowed"
-  ) {
-    return res.status(400).json({ msg: err.message });
-  }
-  next(err);
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
 });
 
 router.use(authenticate);
