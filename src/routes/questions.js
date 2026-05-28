@@ -15,17 +15,22 @@ const ChoiceInput = z.object({
   ),
 });
 
+const DIFFICULTIES = ["EASY", "INTERMEDIATE", "HARD", "ELITE"];
+const DifficultyInput = z.enum(DIFFICULTIES).optional();
+
 const TextQuestionInput = z.object({
   type: z.literal("TEXT").optional(),
   question: z.string().min(1),
   answer: z.string().min(1),
   keywords: z.union([z.string(), z.array(z.string())]).optional(),
+  difficulty: DifficultyInput,
 });
 
 const MultipleChoiceQuestionInput = z.object({
   type: z.literal("MULTIPLE_CHOICE"),
   question: z.string().min(1),
   keywords: z.union([z.string(), z.array(z.string())]).optional(),
+  difficulty: DifficultyInput,
   choices: z
     .union([z.string(), z.array(ChoiceInput)])
     .transform((v) => (typeof v === "string" ? JSON.parse(v) : v))
@@ -41,10 +46,16 @@ function parseQuestionInput(body) {
       throw new ValidationError("Exactly one choice must be marked correct");
     }
     parsed.answer = parsed.choices.find((c) => c.isCorrect).text;
+    parsed.difficulty = parsed.difficulty || "EASY";
     return parsed;
   }
   const parsed = TextQuestionInput.parse(body);
-  return { ...parsed, type: "TEXT", choices: null };
+  return {
+    ...parsed,
+    type: "TEXT",
+    choices: null,
+    difficulty: parsed.difficulty || "EASY",
+  };
 }
 
 function normalizeKeywords(kw) {
@@ -97,15 +108,19 @@ const formatQuestion = (question, { includeCorrect = false } = {}) => {
   };
 };
 
-// GET /api/questions, /api/questions?keyword=france&page=1&limit=5
+// GET /api/questions, /api/questions?keyword=france&difficulty=HARD&page=1&limit=5
 router.get("/", async (req, res) => {
-  const { keyword } = req.query;
+  const { keyword, difficulty } = req.query;
 
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, parseInt(req.query.limit) || 5);
   const skip = (page - 1) * limit;
 
-  const where = keyword ? { keywords: { some: { name: keyword } } } : {};
+  const where = {};
+  if (keyword) where.keywords = { some: { name: keyword } };
+  if (difficulty && DIFFICULTIES.includes(difficulty)) {
+    where.difficulty = difficulty;
+  }
 
   const [filteredQuestions, total] = await Promise.all([
     prisma.question.findMany({
@@ -150,7 +165,7 @@ router.get("/:id", async (req, res) => {
 // POST /api/questions
 router.post("/", upload.single("image"), async (req, res) => {
   const parsed = parseQuestionInput(req.body);
-  const { question, answer, keywords, type, choices } = parsed;
+  const { question, answer, keywords, type, choices, difficulty } = parsed;
 
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
@@ -158,6 +173,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     data: {
       question,
       type,
+      difficulty,
       imageUrl,
       keywords: {
         connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({
@@ -238,7 +254,7 @@ router.put("/:id", upload.single("image"), isOwner, async (req, res) => {
   }
 
   const parsed = parseQuestionInput(req.body);
-  const { question, answer, keywords, type, choices } = parsed;
+  const { question, answer, keywords, type, choices, difficulty } = parsed;
 
   const imageUrl = req.file
     ? `/uploads/${req.file.filename}`
@@ -251,6 +267,7 @@ router.put("/:id", upload.single("image"), isOwner, async (req, res) => {
       data: {
         question,
         type,
+        difficulty,
         keywords: {
           set: [],
           connectOrCreate: normalizeKeywords(keywords).map((keyword) => ({

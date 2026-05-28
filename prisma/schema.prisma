@@ -29,6 +29,7 @@ model Question {
   question String @db.VarChar(255)
   answer String @db.VarChar(255)
   type QuestionType @default(TEXT)
+  difficulty Difficulty @default(EASY)
   keywords Keyword[]
   choices Choice[]
   imageUrl String? @db.VarChar(255)
@@ -42,6 +43,13 @@ model Question {
 enum QuestionType {
   TEXT
   MULTIPLE_CHOICE
+}
+
+enum Difficulty {
+  EASY
+  INTERMEDIATE
+  HARD
+  ELITE
 }
 
 model Choice {

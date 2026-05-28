@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `questions` ADD COLUMN `difficulty` ENUM('EASY', 'INTERMEDIATE', 'HARD', 'ELITE') NOT NULL DEFAULT 'EASY';

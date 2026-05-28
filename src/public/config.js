@@ -15,4 +15,10 @@ const CONFIG = {
   API_FIELDS: {
     SOLVED: "solved",
   },
+  DIFFICULTIES: [
+    { value: "EASY", label: "Easy", className: "easy" },
+    { value: "INTERMEDIATE", label: "Intermediate", className: "intermediate" },
+    { value: "HARD", label: "Hard", className: "hard" },
+    { value: "ELITE", label: "Elite", className: "elite" },
+  ],
 };

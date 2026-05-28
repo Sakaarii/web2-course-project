@@ -12,6 +12,12 @@ window.onRecaptchaLoad = function() {
 };
 
 // --- Helpers ---
+function difficultyBadge(value) {
+  const d = CONFIG.DIFFICULTIES.find((x) => x.value === value);
+  if (!d) return "";
+  return `<span class="badge-difficulty ${d.className}">${d.label}</span>`;
+}
+
 function getCurrentUserId() {
   const token = getToken();
   if (!token) return null;
@@ -153,7 +159,7 @@ async function showApp() {
   await loadQuestions();
 }
 
-async function loadQuestions(keyword = "", page = 1) {
+async function loadQuestions(keyword = "", page = 1, difficulty = "") {
   const container = document.getElementById("questions-container");
   container.innerHTML = '<p class="loading">Loading questions...</p>';
 
@@ -163,6 +169,7 @@ async function loadQuestions(keyword = "", page = 1) {
       limit: CONFIG.QUESTIONS_PER_PAGE,
     });
     if (keyword) params.set("keyword", keyword);
+    if (difficulty) params.set("difficulty", difficulty);
     const result = await apiFetch(`${CONFIG.ROUTES.QUESTIONS}?${params}`);
     const { data: questions, total, totalPages } = result;
     const currentUserId = getCurrentUserId();
@@ -185,9 +192,16 @@ async function loadQuestions(keyword = "", page = 1) {
       <div class="toolbar">
         <button class="btn btn-primary" id="new-question-btn">+ New Question</button>
         <div class="search-bar">
+          <select id="difficulty-filter" class="difficulty-filter">
+            <option value="">All difficulties</option>
+            ${CONFIG.DIFFICULTIES.map(
+              (d) =>
+                `<option value="${d.value}" ${difficulty === d.value ? "selected" : ""}>${d.label}</option>`,
+            ).join("")}
+          </select>
           <input type="text" id="keyword-input" placeholder="Search by keyword..." value="${keyword}" />
           <button class="btn btn-search" id="search-btn">Search</button>
-          ${keyword ? `<button class="btn btn-clear" id="clear-btn">Clear</button>` : ""}
+          ${keyword || difficulty ? `<button class="btn btn-clear" id="clear-btn">Clear</button>` : ""}
         </div>
       </div>`;
 
@@ -201,6 +215,7 @@ async function loadQuestions(keyword = "", page = 1) {
         <article class="question-card ${q[CONFIG.API_FIELDS.SOLVED] ? "solved-card" : ""}">
           <h3>
             <a href="#" class="question-link" data-id="${q.id}">${q.question}</a>
+            ${difficultyBadge(q.difficulty)}
             ${q.type === "MULTIPLE_CHOICE" ? `<span class="badge-mc">Multiple choice</span>` : ""}
             ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}
           </h3>
@@ -243,14 +258,32 @@ async function loadQuestions(keyword = "", page = 1) {
       .getElementById("new-question-btn")
       .addEventListener("click", () => showQuestionForm());
 
+    const getFilterDifficulty = () =>
+      document.getElementById("difficulty-filter").value;
+
     document.getElementById("search-btn").addEventListener("click", () => {
-      loadQuestions(document.getElementById("keyword-input").value.trim(), 1);
+      loadQuestions(
+        document.getElementById("keyword-input").value.trim(),
+        1,
+        getFilterDifficulty(),
+      );
     });
 
     document
       .getElementById("keyword-input")
       .addEventListener("keydown", (e) => {
-        if (e.key === "Enter") loadQuestions(e.target.value.trim(), 1);
+        if (e.key === "Enter")
+          loadQuestions(e.target.value.trim(), 1, getFilterDifficulty());
+      });
+
+    document
+      .getElementById("difficulty-filter")
+      .addEventListener("change", (e) => {
+        loadQuestions(
+          document.getElementById("keyword-input").value.trim(),
+          1,
+          e.target.value,
+        );
       });
 
     const clearBtn = document.getElementById("clear-btn");
@@ -258,11 +291,15 @@ async function loadQuestions(keyword = "", page = 1) {
 
     const prevBtn = document.getElementById("prev-btn");
     if (prevBtn)
-      prevBtn.addEventListener("click", () => loadQuestions(keyword, page - 1));
+      prevBtn.addEventListener("click", () =>
+        loadQuestions(keyword, page - 1, difficulty),
+      );
 
     const nextBtn = document.getElementById("next-btn");
     if (nextBtn)
-      nextBtn.addEventListener("click", () => loadQuestions(keyword, page + 1));
+      nextBtn.addEventListener("click", () =>
+        loadQuestions(keyword, page + 1, difficulty),
+      );
 
     container.querySelectorAll(".question-link, .read-more").forEach((el) => {
       el.addEventListener("click", (e) => {
@@ -308,6 +345,7 @@ async function loadQuestionDetail(qId) {
       <a href="#" id="back-btn" class="back-link">&larr; Back to questions</a>
       <article class="question-card question-detail">
         <h3>${q.question}
+          ${difficultyBadge(q.difficulty)}
           ${q.type === "MULTIPLE_CHOICE" ? `<span class="badge-mc">Multiple choice</span>` : ""}
           ${q[CONFIG.API_FIELDS.SOLVED] ? `<span class="badge-solved">Solved</span>` : ""}
         </h3>
@@ -373,7 +411,14 @@ function renderChoiceRow(idx, text = "", checked = false) {
 async function showQuestionForm(qId) {
   const container = document.getElementById("questions-container");
   const isEdit = !!qId;
-  let q = { question: "", answer: "", keywords: [], type: "TEXT", choices: [] };
+  let q = {
+    question: "",
+    answer: "",
+    keywords: [],
+    type: "TEXT",
+    choices: [],
+    difficulty: "EASY",
+  };
 
   if (isEdit) {
     try {
@@ -405,6 +450,15 @@ async function showQuestionForm(qId) {
         <div class="form-group">
           <label for="q-question">Question</label>
           <input type="text" id="q-question" value="${q.question.replace(/"/g, "&quot;")}" required />
+        </div>
+        <div class="form-group">
+          <label for="q-difficulty">Difficulty</label>
+          <select id="q-difficulty" class="difficulty-filter">
+            ${CONFIG.DIFFICULTIES.map(
+              (d) =>
+                `<option value="${d.value}" ${(q.difficulty || "EASY") === d.value ? "selected" : ""}>${d.label}</option>`,
+            ).join("")}
+          </select>
         </div>
         <div class="form-group" id="text-answer-group">
           <label for="q-answer">Answer</label>
@@ -512,6 +566,7 @@ async function showQuestionForm(qId) {
       const body = new FormData();
       body.append("type", type);
       body.append("question", document.getElementById("q-question").value);
+      body.append("difficulty", document.getElementById("q-difficulty").value);
       body.append("keywords", document.getElementById("q-keywords").value);
 
       if (type === "MULTIPLE_CHOICE") {

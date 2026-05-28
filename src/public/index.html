@@ -293,6 +293,50 @@
                 border: 1px solid rgba(167, 139, 250, 0.25);
             }
 
+            /* Difficulty badge */
+            .badge-difficulty {
+                color: #fff;
+                padding: 0.2rem 0.7rem;
+                border-radius: 20px;
+                font-size: 0.7rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border: 1px solid rgba(0, 0, 0, 0.15);
+            }
+            .badge-difficulty.easy {
+                background: linear-gradient(135deg, #40c057, #2f9e44);
+            }
+            .badge-difficulty.intermediate {
+                background: linear-gradient(135deg, #fcc419, #f59f00);
+                color: #1a1a2e;
+            }
+            .badge-difficulty.hard {
+                background: linear-gradient(135deg, #ff922b, #f76707);
+            }
+            .badge-difficulty.elite {
+                background: linear-gradient(135deg, #ff6b6b, #e03131);
+            }
+
+            .difficulty-filter {
+                padding: 0.55rem 1rem;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 10px;
+                font-size: 0.85rem;
+                font-family: inherit;
+                color: #fff;
+                cursor: pointer;
+            }
+            .difficulty-filter:focus {
+                outline: none;
+                border-color: #ffd200;
+            }
+            .difficulty-filter option {
+                background: #24243e;
+                color: #fff;
+            }
+
             /* Multiple-choice badge */
             .badge-mc {
                 background: linear-gradient(135deg, #a78bfa, #7c3aed);
